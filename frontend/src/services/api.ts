@@ -17,7 +17,24 @@ import type {
   AuthResponse,
 } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const rawBaseUrl = import.meta.env.VITE_API_BASE_URL;
+const isProduction = import.meta.env.PROD;
+
+function resolveApiBaseUrl(): string {
+  const trimmed = rawBaseUrl?.trim();
+  if (trimmed) {
+    // In production, ensure localhost is never used
+    const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(trimmed);
+    if (!isProduction || !isLocalhost) {
+      return trimmed.replace(/\/+$/, '');
+    }
+  }
+  return isProduction
+    ? 'https://careerpilot-backend-4nk2.onrender.com'
+    : 'http://localhost:8000';
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
 
 // Token Management
 export function getAuthToken(): string | null {

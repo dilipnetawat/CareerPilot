@@ -98,6 +98,85 @@ def test_get_analysis_not_found():
     print("[PASS] GET /api/analysis/{id} returned 404 for unknown ID.")
 
 
+def test_cors_approved_careerpilot_origin_preflight():
+    """Verify that approved CareerPilot domains pass preflight with credentials."""
+    for origin in [
+        "https://career-pilot-doncscz65-pixel-5edd96ca.vercel.app",
+        "https://career-pilot.vercel.app",
+    ]:
+        res = client.options(
+            "/api/auth/signup",
+            headers={
+                "Origin": origin,
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "content-type",
+            },
+        )
+        assert res.status_code == 200, f"CORS preflight failed for {origin}: {res.status_code} {res.text}"
+        assert res.headers.get("access-control-allow-origin") == origin
+        assert res.headers.get("access-control-allow-credentials") == "true"
+    print("[PASS] CORS preflight for approved CareerPilot domains succeeded.")
+
+
+def test_cors_unrelated_vercel_origin_rejected():
+    """Verify that unrelated origins (including other Vercel sites) are strictly rejected."""
+    unrelated_origin = "https://unrelated-test-site.vercel.app"
+    # Preflight OPTIONS request should be rejected (HTTP 400 from CORSMiddleware without allow-origin)
+    res = client.options(
+        "/api/auth/signup",
+        headers={
+            "Origin": unrelated_origin,
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+    assert res.status_code == 400 or res.headers.get("access-control-allow-origin") != unrelated_origin
+    assert res.headers.get("access-control-allow-origin") is None
+
+    # Normal GET request with unapproved origin must not grant access-control-allow-origin
+    get_res = client.get(
+        "/api/health",
+        headers={"Origin": unrelated_origin},
+    )
+    assert get_res.headers.get("access-control-allow-origin") is None
+    print("[PASS] CORS correctly rejected unrelated Vercel origin without granting origin or credentials.")
+
+
+def test_cors_origin_assembler_normalization():
+    """Verify that assemble_cors_origins cleans trailing slashes, quotes, and empty values, and handles production fallbacks."""
+    from app.config import Settings, APPROVED_PRODUCTION_ORIGINS
+    raw_json = '["https://preview-1.vercel.app/", "https://preview-2.vercel.app", ""]'
+    cleaned = Settings.assemble_cors_origins(raw_json)
+    assert "https://preview-1.vercel.app" in cleaned
+    assert "https://preview-2.vercel.app" in cleaned
+    assert "https://preview-1.vercel.app/" not in cleaned
+    assert "" not in cleaned
+
+    # Fallback in development when empty
+    fallback = Settings.assemble_cors_origins("")
+    assert "http://localhost:5173" in fallback
+
+    # Production settings should never authorize dev origins on empty or missing config
+    prod_settings_missing = Settings(
+        ENVIRONMENT="production",
+        JWT_SECRET="a" * 32,
+    )
+    assert "http://localhost:5173" not in prod_settings_missing.CORS_ORIGINS
+    assert "http://127.0.0.1:5173" not in prod_settings_missing.CORS_ORIGINS
+    for approved in APPROVED_PRODUCTION_ORIGINS:
+        assert approved in prod_settings_missing.CORS_ORIGINS
+
+    prod_settings_empty = Settings(
+        ENVIRONMENT="production",
+        CORS_ORIGINS="",
+        JWT_SECRET="a" * 32,
+    )
+    assert "http://localhost:5173" not in prod_settings_empty.CORS_ORIGINS
+    for approved in APPROVED_PRODUCTION_ORIGINS:
+        assert approved in prod_settings_empty.CORS_ORIGINS
+    print("[PASS] assemble_cors_origins correctly normalizes origins and handles production fallbacks.")
+
+
 if __name__ == "__main__":
     test_analyze_missing_role()
     test_analyze_short_jd()
@@ -105,4 +184,7 @@ if __name__ == "__main__":
     test_analyze_missing_api_key()
     test_list_analyses_endpoint()
     test_get_analysis_not_found()
+    test_cors_approved_careerpilot_origin_preflight()
+    test_cors_unrelated_vercel_origin_rejected()
+    test_cors_origin_assembler_normalization()
     print("\nALL API ENDPOINT INTEGRATION TESTS PASSED!")

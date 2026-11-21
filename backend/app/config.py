@@ -2,10 +2,21 @@ import json
 import os
 from pathlib import Path
 from typing import List, Union
-from pydantic import field_validator
+from pydantic import field_validator, ValidationInfo
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
+
+APPROVED_PRODUCTION_ORIGINS: List[str] = [
+    "https://career-pilot-doncscz65-pixel-5edd96ca.vercel.app",
+    "https://career-pilot.vercel.app",
+]
+
+DEFAULT_DEV_ORIGINS: List[str] = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+]
 
 
 class Settings(BaseSettings):
@@ -14,10 +25,7 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     API_V1_PREFIX: str = "/api"
     DATABASE_URL: str = "sqlite:///./careerpilot.db"
-    CORS_ORIGINS: Union[List[str], str] = [
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ]
+    CORS_ORIGINS: Union[List[str], str] = []
     # Gemini AI Configuration
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-3.6-flash"
@@ -50,14 +58,46 @@ class Settings(BaseSettings):
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
+        env = os.environ.get("ENVIRONMENT", "development").strip().lower()
+        default_fallback = (
+            list(APPROVED_PRODUCTION_ORIGINS)
+            if env == "production"
+            else list(DEFAULT_DEV_ORIGINS) + list(APPROVED_PRODUCTION_ORIGINS)
+        )
         if isinstance(v, str):
-            try:
-                parsed = json.loads(v)
-                if isinstance(parsed, list):
-                    return parsed
-            except Exception:
-                pass
-            return [origin.strip() for origin in v.split(",") if origin.strip()]
+            v_clean = v.strip()
+            if not v_clean:
+                cleaned = []
+            else:
+                try:
+                    parsed = json.loads(v_clean)
+                    if isinstance(parsed, list):
+                        cleaned = [str(o).strip().strip("'\"").rstrip("/") for o in parsed if str(o).strip().strip("'\"")]
+                    else:
+                        cleaned = []
+                except Exception:
+                    cleaned = [o.strip().strip("'\"").rstrip("/") for o in v_clean.split(",") if o.strip().strip("'\"")]
+        elif isinstance(v, list):
+            cleaned = [str(o).strip().strip("'\"").rstrip("/") for o in v if str(o).strip().strip("'\"")]
+        else:
+            cleaned = []
+
+        if not cleaned:
+            return default_fallback
+
+        for domain in APPROVED_PRODUCTION_ORIGINS:
+            if domain not in cleaned:
+                cleaned.append(domain)
+        return cleaned
+
+    @field_validator("CORS_ORIGINS")
+    @classmethod
+    def finalize_cors_origins(cls, v: List[str], info: ValidationInfo) -> List[str]:
+        env = str(info.data.get("ENVIRONMENT", os.environ.get("ENVIRONMENT", "development"))).strip().lower()
+        if env == "production":
+            # In production, ensure development origins are never accidentally authorized
+            safe_origins = [o for o in v if not any(dev in o for dev in ["localhost", "127.0.0.1"])]
+            return safe_origins or list(APPROVED_PRODUCTION_ORIGINS)
         return v
 
     model_config = SettingsConfigDict(
