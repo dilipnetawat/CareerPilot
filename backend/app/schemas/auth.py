@@ -17,6 +17,7 @@ class UserResponse(BaseModel):
     email: str
     full_name: str
     created_at: str
+    is_demo: bool = False
 
 
 class TokenResponse(BaseModel):

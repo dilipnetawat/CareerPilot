@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.database.session import get_db
@@ -18,7 +18,10 @@ from app.services.auth_service import (
     create_access_token,
     get_current_user,
     ensure_demo_user_seeded,
+    is_demo_user,
+    authenticate_public_demo_user,
 )
+from app.services.rate_limiter import demo_login_rate_limiter, get_client_ip
 
 router = APIRouter(prefix="/auth", tags=["Authentication & User Accounts"])
 
@@ -29,6 +32,7 @@ def _to_user_response(user: User) -> UserResponse:
         email=user.email,
         full_name=user.full_name,
         created_at=user.created_at.isoformat() if user.created_at else datetime.now(timezone.utc).isoformat(),
+        is_demo=is_demo_user(user),
     )
 
 
@@ -115,6 +119,32 @@ def demo_login(db: Session = Depends(get_db)):
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Demo evaluation login is currently disabled.",
         )
+    token = create_access_token(demo_user.id, demo_user.email)
+    return TokenResponse(
+        access_token=token,
+        token_type="bearer",
+        user=_to_user_response(demo_user),
+    )
+
+
+@router.post(
+    "/public-demo-login",
+    response_model=TokenResponse,
+    summary="Public one-click demo login returning a genuine authenticated JWT token",
+)
+def public_demo_login(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    Public demo account authentication endpoint.
+    Protected by rate-limiting and the ENABLE_PUBLIC_DEMO_LOGIN configuration flag.
+    Returns a normal valid JWT for exploring the application.
+    """
+    client_ip = get_client_ip(request)
+    demo_login_rate_limiter.check(client_ip)
+
+    demo_user = authenticate_public_demo_user(db)
     token = create_access_token(demo_user.id, demo_user.email)
     return TokenResponse(
         access_token=token,

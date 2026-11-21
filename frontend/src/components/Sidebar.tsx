@@ -34,6 +34,7 @@ interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
   candidateName: string;
+  isDemo?: boolean;
   onSignOut: () => void;
 }
 
@@ -50,6 +51,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
   onClose,
   candidateName,
+  isDemo = false,
   onSignOut,
 }) => {
   const isHealthy = health?.status === 'healthy';
@@ -112,8 +114,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-semibold text-white truncate">{candidateName}</p>
                 <div className="flex items-center space-x-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                  <span className="text-[10px] text-slate-400">Demo Active</span>
+                  <span className={`w-1.5 h-1.5 rounded-full ${isDemo ? 'bg-amber-400' : 'bg-emerald-400'}`} />
+                  <span className="text-[10px] text-slate-400">
+                    {isDemo ? 'Demo Active' : 'Active Account'}
+                  </span>
                 </div>
               </div>
             </div>

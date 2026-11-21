@@ -8,6 +8,7 @@ interface NavbarProps {
   error: string | null;
   onToggleSidebar?: () => void;
   candidateName?: string;
+  isDemo?: boolean;
   onSignOut?: () => void;
 }
 
@@ -17,6 +18,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   error,
   onToggleSidebar,
   candidateName,
+  isDemo = false,
   onSignOut,
 }) => {
   const isHealthy = health?.status === 'healthy';
@@ -55,9 +57,11 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div className="hidden sm:flex items-center space-x-2 px-3 py-1.5 rounded-full bg-slate-800/80 border border-slate-700/60 text-xs">
               <User className="w-3.5 h-3.5 text-indigo-400" />
               <span className="text-slate-200 font-medium">{candidateName}</span>
-              <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300">
-                Demo
-              </span>
+              {isDemo && (
+                <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  Demo
+                </span>
+              )}
             </div>
           )}
 

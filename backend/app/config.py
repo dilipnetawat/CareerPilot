@@ -33,9 +33,14 @@ class Settings(BaseSettings):
     # JWT Authentication
     JWT_SECRET: str = "careerpilot-ai-secure-jwt-key-change-in-production"
 
-    # Demo Evaluation Login Control
+    # Demo Evaluation Login Control (Development Only)
     ENABLE_DEMO_LOGIN: bool = True
     DEMO_USER_PASSWORD: str = ""
+
+    # Public Demo Login Configuration (Visitor Exploration)
+    ENABLE_PUBLIC_DEMO_LOGIN: bool = False
+    DEMO_ACCOUNT_EMAIL: str = "demo@careerpilot.ai"
+    DEMO_ACCOUNT_PASSWORD: str = ""
 
     # Upload Constraints
     MAX_UPLOAD_SIZE_MB: int = 5

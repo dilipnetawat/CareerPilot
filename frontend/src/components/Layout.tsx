@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Sparkles } from 'lucide-react';
 import { Navbar } from './Navbar';
 import { Sidebar } from './Sidebar';
 import type {
@@ -22,6 +23,7 @@ interface LayoutProps {
   loading: boolean;
   error: string | null;
   candidateName?: string;
+  isDemo?: boolean;
   onSignOut?: () => void;
 }
 
@@ -39,6 +41,7 @@ export const Layout: React.FC<LayoutProps> = ({
   loading,
   error,
   candidateName = 'Candidate (Demo)',
+  isDemo = false,
   onSignOut,
 }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -59,17 +62,32 @@ export const Layout: React.FC<LayoutProps> = ({
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         candidateName={candidateName}
+        isDemo={isDemo}
         onSignOut={onSignOut || (() => {})}
       />
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 lg:pl-72">
+        {/* Shared Demo Warning Banner */}
+        {isDemo && (
+          <div className="bg-amber-950/70 border-b border-amber-500/30 px-4 py-2 text-xs text-amber-200 flex items-center justify-between z-20">
+            <div className="flex items-center space-x-2">
+              <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>You&apos;re exploring a shared demo account. Do not enter personal or sensitive information.</span>
+            </div>
+            <span className="hidden sm:inline-block text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+              Shared Demo
+            </span>
+          </div>
+        )}
+
         <Navbar
           health={health}
           loading={loading}
           error={error}
           onToggleSidebar={() => setSidebarOpen(true)}
           candidateName={candidateName}
+          isDemo={isDemo}
           onSignOut={onSignOut}
         />
 

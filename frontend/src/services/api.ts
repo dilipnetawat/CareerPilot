@@ -43,7 +43,7 @@ export function getAuthToken(): string | null {
 
 export function setAuthSession(token: string, user: UserProfile): void {
   localStorage.setItem('careerpilot_access_token', token);
-  localStorage.setItem('careerpilot_demo_session', 'true');
+  localStorage.setItem('careerpilot_demo_session', user.is_demo ? 'true' : 'false');
   localStorage.setItem('careerpilot_demo_user', user.full_name);
   localStorage.setItem('careerpilot_user_profile', JSON.stringify(user));
 }
@@ -108,10 +108,19 @@ export async function loginUser(email: string, password: string): Promise<AuthRe
 }
 
 export async function demoLoginUser(): Promise<AuthResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/auth/demo-login`, {
+  // Call dedicated public demo login endpoint
+  let response = await fetch(`${API_BASE_URL}/api/auth/public-demo-login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
   });
+
+  // Development fallback to legacy /demo-login if 404
+  if (response.status === 404 && !import.meta.env.PROD) {
+    response = await fetch(`${API_BASE_URL}/api/auth/demo-login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
 
   if (!response.ok) {
     let detail = 'Failed to initiate evaluation demo session.';

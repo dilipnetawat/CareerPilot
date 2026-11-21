@@ -16,7 +16,7 @@ from app.schemas.application import (
     ApplicationAnalyticsResponse,
     RoleCategoryAnalytics,
 )
-from app.services.auth_service import get_current_user
+from app.services.auth_service import get_current_user, is_demo_user
 
 router = APIRouter(prefix="/applications", tags=["Job Application Tracker & Analytics"])
 
@@ -372,6 +372,15 @@ def delete_application(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Job application '{application_id}' not found.",
         )
+
+    # Protect seeded sample data from deletion in shared demo mode
+    if is_demo_user(current_user):
+        if app.notes and "[PROTECTED_SAMPLE]" in app.notes:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Protected sample data cannot be deleted in shared demo mode.",
+            )
+
     db.delete(app)
     db.commit()
     return None

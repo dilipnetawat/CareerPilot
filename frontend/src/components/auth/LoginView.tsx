@@ -32,10 +32,6 @@ export const LoginView: React.FC<LoginViewProps> = ({
   const [demoLoading, setDemoLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // In production builds (import.meta.env.PROD), shared demo evaluation login is hidden
-  // to protect personal candidate workspaces from shared multi-user mutation.
-  const isDemoLoginAvailable = import.meta.env.DEV && import.meta.env.VITE_ENABLE_DEMO_LOGIN !== 'false';
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -204,30 +200,32 @@ export const LoginView: React.FC<LoginViewProps> = ({
           </button>
         </form>
 
-        {/* Instant Evaluation Demo Access — Only rendered in local development */}
-        {isDemoLoginAvailable && (
-          <>
-            <div className="flex items-center space-x-3 text-slate-600">
-              <div className="flex-1 h-px bg-slate-800" />
-              <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500">Dev Quick Test</span>
-              <div className="flex-1 h-px bg-slate-800" />
-            </div>
+        {/* Instant Public Demo Access */}
+        <div className="flex items-center space-x-3 text-slate-600">
+          <div className="flex-1 h-px bg-slate-800" />
+          <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500">or explore instantly</span>
+          <div className="flex-1 h-px bg-slate-800" />
+        </div>
 
-            <button
-              type="button"
-              onClick={handleDemoAccess}
-              disabled={loading || demoLoading}
-              className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold text-xs flex items-center justify-center space-x-2 transition-colors cursor-pointer disabled:opacity-60"
-            >
-              {demoLoading ? (
-                <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-400" />
-              ) : (
-                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              )}
-              <span>One-Click Demo Evaluation Login</span>
-            </button>
-          </>
-        )}
+        <div className="space-y-2.5">
+          <button
+            type="button"
+            onClick={handleDemoAccess}
+            disabled={loading || demoLoading}
+            className="w-full py-3 rounded-xl bg-linear-to-r from-amber-500/10 via-indigo-500/10 to-purple-500/10 hover:from-amber-500/20 hover:via-indigo-500/20 hover:to-purple-500/20 text-indigo-300 hover:text-white border border-indigo-500/30 hover:border-indigo-400 font-semibold text-xs flex items-center justify-center space-x-2 transition-all cursor-pointer disabled:opacity-60 shadow-md"
+          >
+            {demoLoading ? (
+              <RefreshCw className="w-4 h-4 animate-spin text-amber-400" />
+            ) : (
+              <Sparkles className="w-4 h-4 text-amber-400" />
+            )}
+            <span>{demoLoading ? 'Starting Demo Session...' : 'Try Demo Account'}</span>
+          </button>
+
+          <p className="text-[11px] text-slate-400 text-center leading-relaxed">
+            You&apos;re exploring a shared demo account. Do not enter personal or sensitive information.
+          </p>
+        </div>
 
         <div className="text-center">
           <p className="text-[11px] text-slate-500">

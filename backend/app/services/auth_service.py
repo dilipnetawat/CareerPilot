@@ -19,9 +19,115 @@ JWT_EXPIRE_DAYS = 7
 
 security = HTTPBearer(auto_error=False)
 
-DEMO_USER_ID = "00000000-0000-4000-8000-000000000001"
+PUBLIC_DEMO_USER_ID = "00000000-0000-4000-8000-000000000001"
+DEFAULT_PUBLIC_DEMO_NAME = "CareerPilot Demo Explorer"
+
+DEMO_USER_ID = PUBLIC_DEMO_USER_ID
 DEMO_EMAIL = "demo@careerpilot.ai"
 DEMO_NAME = "Demo Candidate"
+
+
+def is_demo_user(user: Optional[User]) -> bool:
+    """Checks whether a User instance corresponds to the demo account."""
+    if not user:
+        return False
+    configured_demo_email = (settings.DEMO_ACCOUNT_EMAIL or "demo@careerpilot.ai").strip().lower()
+    return (
+        user.id == PUBLIC_DEMO_USER_ID
+        or user.id == DEMO_USER_ID
+        or user.email.strip().lower() == configured_demo_email
+        or user.email.strip().lower() == DEMO_EMAIL.lower()
+    )
+
+
+def ensure_public_demo_user(db: Session) -> User:
+    """
+    Idempotently ensures the dedicated public demo user exists with hashed credentials.
+    Reads email and password from backend configuration / environment variables.
+    Never overwrites an existing real account.
+    """
+    email = (settings.DEMO_ACCOUNT_EMAIL or "demo@careerpilot.ai").strip().lower()
+    password = (settings.DEMO_ACCOUNT_PASSWORD or "").strip()
+
+    if not password:
+        # In non-production environments, allow fallback demo password if unset
+        if settings.ENVIRONMENT.lower() != "production":
+            password = (settings.DEMO_USER_PASSWORD or "").strip() or "CareerPilotDemo2026!"
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Public demo account credentials are not configured on this server.",
+            )
+
+    existing_user = db.query(User).filter(User.email == email).first()
+    if not existing_user:
+        # Check if the well-known PUBLIC_DEMO_USER_ID is free
+        id_collision = db.query(User).filter(User.id == PUBLIC_DEMO_USER_ID).first()
+        demo_id = PUBLIC_DEMO_USER_ID if not id_collision else str(secrets.token_hex(16))
+
+        new_demo_user = User(
+            id=demo_id,
+            email=email,
+            full_name=DEFAULT_PUBLIC_DEMO_NAME,
+            hashed_password=hash_password(password),
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
+        )
+        try:
+            db.add(new_demo_user)
+            db.commit()
+            db.refresh(new_demo_user)
+            return new_demo_user
+        except Exception:
+            db.rollback()
+            existing_user = db.query(User).filter(User.email == email).first()
+            if existing_user:
+                return existing_user
+            raise
+
+    # If the user exists and is confirmed as the demo account, sync password hash if changed
+    if is_demo_user(existing_user):
+        if not verify_password(password, existing_user.hashed_password):
+            existing_user.hashed_password = hash_password(password)
+            db.commit()
+            db.refresh(existing_user)
+        return existing_user
+
+    # If an existing user has the demo email but is not a recognized demo user, do NOT overwrite
+    return existing_user
+
+
+def authenticate_public_demo_user(db: Session) -> User:
+    """
+    Validates public demo configuration and authenticates the demo account
+    using standard PBKDF2 password verification without bypassing hashing.
+    """
+    if not settings.ENABLE_PUBLIC_DEMO_LOGIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Public demo account access is currently disabled.",
+        )
+
+    password = (settings.DEMO_ACCOUNT_PASSWORD or "").strip()
+    if not password:
+        if settings.ENVIRONMENT.lower() != "production":
+            password = (settings.DEMO_USER_PASSWORD or "").strip() or "CareerPilotDemo2026!"
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Public demo account is not properly configured.",
+            )
+
+    demo_user = ensure_public_demo_user(db)
+
+    # Validate credentials via PBKDF2 verification
+    if not verify_password(password, demo_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Failed to authenticate demo account credentials.",
+        )
+
+    return demo_user
 
 
 def hash_password(password: str) -> str:

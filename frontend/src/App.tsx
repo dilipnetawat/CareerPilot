@@ -292,6 +292,8 @@ export function App() {
   }
 
   // 3. Authenticated Dashboard Workspace
+  const isDemoSession = Boolean(currentUser?.is_demo || localStorage.getItem('careerpilot_demo_session') === 'true');
+
   return (
     <Layout
       currentView={currentView}
@@ -305,7 +307,8 @@ export function App() {
       health={health}
       loading={healthLoading}
       error={healthError}
-      candidateName={currentUser?.full_name || 'Candidate'}
+      candidateName={currentUser?.full_name || (isDemoSession ? 'Demo Explorer' : 'Candidate')}
+      isDemo={isDemoSession}
       onSignOut={handleSignOut}
     >
       <HomePage
